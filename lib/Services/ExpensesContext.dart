@@ -1,44 +1,45 @@
-import 'package:budget_planer/Models/WalletEntry.dart';
+import 'dart:io';
+import 'package:budget_planer/Models/Contexts/CategoryContext.dart';
+import 'package:budget_planer/Models/Contexts/LabelsContext.dart';
+import 'package:budget_planer/Models/Contexts/WalletEntryContext.dart';
+import 'package:budget_planer/Models/Contexts/WalletsContext.dart';
 import 'package:budget_planer/Services/IDataContext.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class ExpensesContext extends IDataContext {
-  Future<void> connectToDb(String dbName) async {
+  Database? db;
+
+  Future<void> init(String dbName) async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    try{
-      var path = join(await getDatabasesPath(), dbName);
+    try {
+      var path = await getDatabasesPath();
+      await Directory(path).create(recursive: true);
+
+      path = join(path, dbName);
       db = await openDatabase(path);
-    }
-    catch(e){
+    } catch (e) {
       print(e);
     }
-  }
-
-  Database? db;
-  Future<List<WalletEntry>> getAllEntries() async {
 
     print('tables:');
-    (await db?.query('sqlite_master', columns: ['type', 'name']))?.forEach((row) {
+    (await db?.query('sqlite_master', columns: ['type', 'name']))
+        ?.forEach((row) {
       print(row.values);
     });
 
-    final List<Map<String, Object?>> entriesMap =
-        //await db?.rawQuery("SELECT * FROM WalletEntries");
-        await db!.query('WalletEntries');
+    //all of these should be injected
+    wallets = WalletsContext(db);
+    await wallets.preloadData();
 
-    return [
-      for (final {
-            'EntryId': entryId as String,
-            'Amount': amount as double,
-            'CategoryId': categoryId as String,
-            'Date': date as String,
-            'LabelId': labelId as String,
-            'WalletId': walletId as String
-          } in entriesMap)
-        WalletEntry(entryId, walletId, DateTime.parse(date), categoryId, labelId, amount)
-    ];
+    categories = CategoryContext(db);
+    await categories.preloadData();
+
+    labels = LabelsContext(db);
+    await labels.preloadData();
+
+    entries = WalletEntryContext(db);
   }
 }
